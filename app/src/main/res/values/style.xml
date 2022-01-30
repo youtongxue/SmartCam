@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="SplashTheme" parent="Theme.AppCompat.NoActionBar">
+<!--        去除 title栏以及actionBar-->
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+<!--        设置开屏图片-->
+        <item name="android:windowBackground">@drawable/ic_first</item>
+    </style>
+
+
+</resources>
