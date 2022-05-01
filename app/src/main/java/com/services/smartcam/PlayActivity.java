@@ -125,7 +125,7 @@ public class PlayActivity extends Activity implements View.OnClickListener, Wind
         mBtnPlay = (Button) findViewById(R.id.btn_play);
 
         //获取EZUIPlayer实例
-        mEZUIPlayer = (EZUIPlayer) findViewById(R.id.player_ui);
+        mEZUIPlayer = (EZUIPlayer) findViewById(R.id.player_ui1);
         //设置加载需要显示的view
         mEZUIPlayer.setLoadingView(initProgressBar());
         mBtnPlay.setOnClickListener(this);

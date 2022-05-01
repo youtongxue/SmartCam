@@ -1,49 +1,45 @@
 package com.services.smartcam;
 
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Point;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
-import android.view.Gravity;
-import android.view.KeyEvent;
 import android.view.OrientationEventListener;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
-import android.widget.SimpleAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.ezvizuikit.open.EZUIError;
 import com.ezvizuikit.open.EZUIKit;
 import com.ezvizuikit.open.EZUIPlayer;
 import com.google.gson.Gson;
 import com.gyf.immersionbar.ImmersionBar;
+import com.hjq.permissions.OnPermissionCallback;
+import com.hjq.permissions.Permission;
+import com.hjq.permissions.XXPermissions;
 import com.kongzue.dialogx.DialogX;
-import com.kongzue.dialogx.dialogs.InputDialog;
 import com.kongzue.dialogx.dialogs.PopTip;
 import com.kongzue.dialogx.dialogs.TipDialog;
 import com.kongzue.dialogx.dialogs.WaitDialog;
 import com.kongzue.dialogx.style.IOSStyle;
-import com.kongzue.dialogx.util.InputInfo;
+import com.monkeyliu.smartfocus.AutoFocusFrameLayout;
+import com.monkeyliu.smartfocus.ColorFocusBorder;
 import com.services.smartcam.EntityClass.EzToken;
 import com.services.smartcam.EntityClass.Mqtt;
 import com.services.smartcam.EntityClass.TimeInfo;
@@ -58,24 +54,17 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-/**
- *fix 初始化Mqtt会收到多条消息，导致Pop弹窗并发造成闪退
- * */
-
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, WindowSizeChangeNotifier.OnWindowSizeChangedListener, EZUIPlayer.EZUIPlayerCallBack {
+public class TvActivity extends AppCompatActivity implements View.OnClickListener, WindowSizeChangeNotifier.OnWindowSizeChangedListener, EZUIPlayer.EZUIPlayerCallBack {
     //Mqtt
-    private final String TAG = "AiotMqtt";
+    private final String TAG = "TvMqtt";
     /* 自动Topic, 用于上报消息 */
     final private String PUB_TOPIC = "anfang";
     /* 自动Topic, 用于接受消息 */
@@ -103,12 +92,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Integer ElevatorStatus = 1;
     private Integer LightStatus = 0;
     //
-    private TextView elevator_status;
-    private TextView light_status;
-    private TextView nodeMCU_status;
-    private TextView rec_status;
-    private TextView date_text;
-    private TextView number;
+    private TextView date_tv_text;
     //实列化layout
     private View elevatorLayout;
     private View lightLayout;
@@ -119,35 +103,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private ImageView lightImg;
     private ImageView nodeMcuImg;
     private ImageView recImg;
-
     private ImageView elevatorStatus;
     private ImageView lightStatus;
     private ImageView nodeMCUStatus;
     private ImageView recStatus;
-
     public EZUIPlayer mPlayer;
     private ImageView stop;
-
     private SharedPreferences sp;
 
-    //listview
-    public ListView mListView = null;
-
-    /* 图片ID数组 */
-    private final int[] mImageId = new int[] {R.drawable.ic_device, R.drawable.ic_error};
-    /* 文字列表数组 */
-    private final String[] mTitle = new String[] {"本机设备号", "萤石错误码"};
-
-
-    //mqtt
-
-    private MqttAndroidClient mqtt_client;                   //创建一个mqtt_client对象
     /**
      * onresume时是否恢复播放
      */
     private boolean isResumePlay = false;
 
-    private MyOrientationDetector mOrientationDetector;
+    private TvActivity.MyOrientationDetector mOrientationDetector;
 
     /**
      *  开发者申请的Appkey
@@ -163,55 +132,43 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      */
     private String playUrl = "ezopen://open.ys7.com/172124816/1.hd.live";
 
-    /**
-     * 海外版本areaDomin
-     */
-    private String mGlobalAreaDomain;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_tv);
 
-        initListView();
-        showDrawer();
-        getDeviceInfo();//获取设备 机型➕第一次打开时间
-        //初始化
+        //操作事件
+        date_tv_text = findViewById(R.id.text_tv_date);
+        //实例化layout布局
+        elevatorLayout = findViewById(R.id.elevator_tv_Layout);
+        lightLayout = findViewById(R.id.light_tv_Layout);
+        nodeMcuLayout = findViewById(R.id.nodeMCU_tv_Layout);
+        recLayout = findViewById(R.id.rec_tv_Layout);
+        //监听事件
+        elevatorLayout.setOnClickListener(this);
+        lightLayout.setOnClickListener(this);
+        nodeMcuLayout.setOnClickListener(this);
+        recLayout.setOnClickListener(this);
+        //图标
+        elevatorImg = findViewById(R.id.elevator_tv_mg);
+        lightImg = findViewById(R.id.light_tv_img);
+        nodeMcuImg = findViewById(R.id.nodeMcu_tv_img);
+        recImg = findViewById(R.id.rec_tv_img);
+        //圆点指示图标
+        elevatorStatus = findViewById(R.id.elevator_status_tv_img);
+        lightStatus = findViewById(R.id.light_status_tv_img);
+        nodeMCUStatus = findViewById(R.id.nodeMCU_status_tv_img);
+        recStatus = findViewById(R.id.rec_status_tv_img);
+        //初始化DialogX并设置主题
         DialogX.init(this);
         DialogX.globalStyle = new IOSStyle();//设置为IOS主题
         //设置为IOS主题
         DialogX.onlyOnePopTip = true;
 
-
-        elevator_status = findViewById(R.id.elevator_status_text);
-        light_status = findViewById(R.id.light_status_text);
-        nodeMCU_status = findViewById(R.id.nodeMCU_status_text);
-        rec_status = findViewById(R.id.rec_status_text);
-        date_text = findViewById(R.id.date);;
-
-        //实例化layout布局
-        elevatorLayout = findViewById(R.id.elevator_Layout);
-        lightLayout = findViewById(R.id.light_Layout);
-        nodeMcuLayout = findViewById(R.id.nodeMCU_Layout);
-        recLayout = findViewById(R.id.rec_Layout);
-        //图标
-        elevatorImg = findViewById(R.id.elevator_mg);
-        lightImg = findViewById(R.id.light_img);
-        nodeMcuImg = findViewById(R.id.nodeMcu_img);
-        recImg = findViewById(R.id.rec_img);
-
-        elevatorStatus = findViewById(R.id.elevator_status_img);
-        lightStatus = findViewById(R.id.light_status_img);
-        nodeMCUStatus = findViewById(R.id.nodeMCU_status_img);
-        recStatus = findViewById(R.id.rec_status_img);
-
-        SetMargin();//设置顶部导航栏高度
-        //init();//初始化机器状
+        getDeviceInfo();
+        checked();
+        getPermission();//获取sdcard读写权限
         setElevatorStatus();
         setLightStatus();
         rec();
@@ -226,12 +183,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             finish();
             return;
         }
-        mOrientationDetector = new MyOrientationDetector(this);
+        mOrientationDetector = new TvActivity.MyOrientationDetector(this);
         new WindowSizeChangeNotifier(this, this);
         //mBtnPlay = (Button) findViewById(R.id.play);
 
         //获取EZUIPlayer实例
-        mPlayer = (EZUIPlayer) findViewById(R.id.player_ui);
+        mPlayer = (EZUIPlayer) findViewById(R.id.player_tv_ui1);
         //
         stop = findViewById(R.id.stop);
         //设置加载需要显示的view
@@ -241,294 +198,40 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         preparePlay();
         setSurfaceSize();
 
-
-    }
-    @Override
-    public void setRequestedOrientation(int requestedOrientation) {
-        super.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
     }
 
-    //重写返回键回掉方法，让按下返回键时 让当前activity隐藏到后台，而不是 调用 finish(); ，第二次打开时就不会再次加载Splash界面
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if(keyCode== KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0){
-            moveTaskToBack(true);
-        }
-        return true;
-    }
-
-
-
-    //mqtt
-
-    /**
-     * @Description 打开软件时，读取信息
-     * @Author 游同学
-     * */
-    public void init(String nowStatus){
-        //订阅
-        Log.e(TAG, "当前初始值状态为:+++++++++++ "+nowStatus );
-        if (nowStatus.equals("Device Offline!")){
-            ElevatorStatus = 0;
-            LightStatus = 0;
-        }else {
-            Mqtt mqtt = gson.fromJson(nowStatus,Mqtt.class);
-            ElevatorStatus = mqtt.getElevatorStatus();
-            LightStatus = mqtt.getLightStatus();
-
-            Log.e(TAG, "setLightStatus: "+mqtt.getElevatorStatus() );
-            date_text.setText("操作时间： "+mqtt.getDate());
-        }
-        if(nodeMCU){
-            nodeMCU_status.setText("在线");
-            nodeMCUStatus.setImageDrawable(getDrawable(R.drawable.ic_online));
-            nodeMcuImg.setImageDrawable(getDrawable(R.drawable.ic_nodemcu_on));
-        }else {
-            nodeMCU_status.setText("离线");
-            nodeMCUStatus.setImageDrawable(getDrawable(R.drawable.ic_offline));
-            nodeMcuImg.setImageDrawable(getDrawable(R.drawable.ic_nodemcu_off));
-        }
-        if (ElevatorStatus == 1){
-            elevator_status.setText("运行");
-            elevatorStatus.setImageDrawable(getDrawable(R.drawable.ic_online));
-            elevatorImg.setImageDrawable(getDrawable(R.drawable.ic_elevator_run));
-
-        }else if (ElevatorStatus == 0){
-            elevator_status.setText("停止");
-            elevatorStatus.setImageDrawable(getDrawable(R.drawable.ic_offline));
-            elevatorImg.setImageDrawable(getDrawable(R.drawable.ic_elevator_stop));
-        }
-        if (LightStatus == 0){
-            light_status.setText("关闭");
-            lightStatus.setImageDrawable(getDrawable(R.drawable.ic_offline));
-            lightImg.setImageDrawable(getDrawable(R.drawable.ic_light_off));
-        }else if (LightStatus == 1){
-            light_status.setText("开启");
-            lightStatus.setImageDrawable(getDrawable(R.drawable.ic_online));
-            lightImg.setImageDrawable(getDrawable(R.drawable.ic_light_on));
-        }
-        if(nodeMCU){
-            rec_status.setText("正常");
-            recStatus.setImageDrawable(getDrawable(R.drawable.ic_online));
-            recImg.setImageDrawable(getDrawable(R.drawable.ic_rec));
-        }else {
-            rec_status.setText("离线");
-            recStatus.setImageDrawable(getDrawable(R.drawable.ic_offline));
-            recImg.setImageDrawable(getDrawable(R.drawable.ic_rec_offline));
-        }
-
-        toast();
-
-
+    public void checked(){
+        //自定义焦点框的效果
+        AutoFocusFrameLayout autoFocusFrameLayout = findViewById(R.id.focus_test);
+        autoFocusFrameLayout.setFocusBorderBuilder(new ColorFocusBorder.Builder(this)
+                .borderWidth(4) //border宽度
+                .borderColor(Color.WHITE) //border颜色
+                .borderRadius(100) //border圆角半径
+                //.shadowWidth(45) //shadow半径
+                //.shadowColor(Color.WHITE) //shadow颜色
+                .padding(0) //内边距
+                .scaleX(1.1f) //X方向缩放倍数
+                .scaleY(1.1f) //Y方向缩放倍数
+                //.enableShimmer()//使用闪光特效
+                );
     }
 
     /**
-     * 控制电梯网络请求
+     * 状态栏管理
      * */
-    public void setElevatorStatus(){
-        //实例化一个请求对象 api
-        elevatorLayout.setOnClickListener(view -> {
-            if (nodeMCU){
-                if (ElevatorStatus == 1){
-                    InputInfo in = new InputInfo();
-                    in.setInputType(0x00000081);
+    public void Clear(){
+        ImmersionBar.with(TvActivity.this)
+                .transparentStatusBar()  //透明状态栏，不写默认透明色
+                .navigationBarColor(R.color.white)
+                .statusBarDarkFont(true)   //状态栏字体是深色，不写默认为亮色
+                .init();
 
-                    //验证授权码
-                    new InputDialog("关闭电梯", "请输入授权码", "确定", "取消")
-//                            .setInputText("test")
-                            .setInputInfo(in)
-                            .setCancelable(false)
-                            .setOkButton((baseDialog, v, inputStr) -> {
-                                //显示等待进度框
-                                WaitDialog.show("正在处理...");
-
-                                baseDialog.getInputText();
-                                //判断输入密码是否正确
-                                if (inputStr.equals("123456")){
-                                    Log.e("test", "电梯 1 》》》》》》 Light"+LightStatus );
-
-                                    date = new Date();
-                                    timeInfo = CustomUtils.LongToString(date);
-                                    time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
-                                    machine.setElevatorStatus(0);
-                                    machine.setLightStatus(LightStatus);
-                                    machine.setDate(time);
-                                    machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
-                                    //将Mqtt bean转换为json
-                                    publishContent = gson.toJson(machine);
-                                    //发布消息
-                                    publishMessage(publishContent);
-
-                                    //发布之后需要判断，nodeMCU返回的信息，来判断是否操作成功
-                                    if (!receiveContent.isEmpty()){
-                                        Mqtt mqtt = gson.fromJson(receiveContent,Mqtt.class);
-                                        //判断接收到到结果与发送的是否相同
-                                        if (mqtt.getElevatorStatus() == ElevatorStatus & mqtt.getLightStatus() == LightStatus){
-                                            ElevatorStatus = 0;
-                                            //设置UI层显示
-//                                            init(receiveContent);
-
-                                        }
-                                    }
-                                }else {
-                                    CustomUtils.runDelayed(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            TipDialog.show("授权码错误", WaitDialog.TYPE.ERROR);
-                                        }
-                                    }, 150);
-                                }
-
-                                return false;
-                            })
-                            .show();
-
-                }else if (ElevatorStatus == 0){
-                    InputInfo in = new InputInfo();
-                    in.setInputType(0x00000081);
-
-                    new InputDialog("开启电梯", "请输入授权码", "确定", "取消")
-//                            .setInputText("test")
-                            .setInputInfo(in)
-                            .setCancelable(false)
-                            .setOkButton((baseDialog, v, inputStr) -> {
-                                //显示等待进度框
-                                WaitDialog.show("处理中...");
-
-                                baseDialog.getInputText();
-                                //判断输入密码是否正确
-                                if (inputStr.equals("123456")){
-                                    date = new Date();
-                                    timeInfo = CustomUtils.LongToString(date);
-                                    time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
-                                    machine.setElevatorStatus(1);
-                                    machine.setLightStatus(LightStatus);
-                                    machine.setDate(time);
-                                    machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
-                                    //将Mqtt bean转换为json
-                                    publishContent = gson.toJson(machine);
-                                    //发布消息
-                                    publishMessage(publishContent);
-
-                                    //发布之后需要判断，nodeMCU返回的信息，来判断是否操作成功
-                                    if (!receiveContent.isEmpty()){
-                                        Mqtt mqtt = gson.fromJson(receiveContent,Mqtt.class);
-                                        //判断接收到到结果与发送的是否相同
-                                        if (mqtt.getElevatorStatus() == ElevatorStatus & mqtt.getLightStatus() == LightStatus){
-                                            ElevatorStatus = 1;
-
-                                            //设置UI层显示
-//                                            init(receiveContent);
-
-                                        }
-                                    }
-                                }else {
-                                    CustomUtils.runDelayed(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            TipDialog.show("密码错误", WaitDialog.TYPE.ERROR);
-                                        }
-                                    }, 150);
-                                }
-
-                                return false;
-                            })
-                            .show();
-
-                }
-            }else {
-                PopTip.show("当前nodeMCU未在线！");
-            }
-
-        });
-
+        //隐藏action bar
+        ActionBar actionBar = getSupportActionBar();
+        assert actionBar != null;
+        actionBar.hide();
     }
 
-    /**
-     * 控制预警灯网络请求
-     * */
-    public void setLightStatus(){
-        lightLayout.setOnClickListener(view -> {
-            if (nodeMCU){
-                //显示等待进度框
-                WaitDialog.show("正在处理...");
-
-                if (LightStatus == 0){
-                    date = new Date();
-                    timeInfo = CustomUtils.LongToString(date);
-                    time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
-                    machine.setElevatorStatus(ElevatorStatus);
-                    machine.setLightStatus(1);
-                    machine.setDate(time);
-                    machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
-                    //将Mqtt bean转换为json
-                    publishContent = gson.toJson(machine);
-                    //发布消息
-                    publishMessage(publishContent);
-
-                    LightStatus = 1;
-                    //设置UI层显示
-//                    init(receiveContent);
-
-                }else if (LightStatus == 1){
-                    date = new Date();
-                    timeInfo = CustomUtils.LongToString(date);
-                    time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
-                    machine.setElevatorStatus(ElevatorStatus);
-                    machine.setLightStatus(0);
-                    machine.setDate(time);
-                    machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
-                    //将Mqtt bean转换为json
-                    publishContent = gson.toJson(machine);
-                    //发布消息
-                    publishMessage(publishContent);
-
-                    LightStatus = 0;
-
-                    //设置UI层显示
-//                    init(receiveContent);
-                }
-            }else {
-                PopTip.show("当前nodeMCU未在线！");
-            }
-
-        });
-
-    }
-
-    /**
-     * 全部复原方法
-     * */
-    public void rec() {
-        recLayout.setOnClickListener(view -> {
-            if (nodeMCU){
-                //显示等待进度框
-                WaitDialog.show("正在处理...");
-
-                date = new Date();
-                timeInfo = CustomUtils.LongToString(date);
-                time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
-                machine.setElevatorStatus(1);
-                machine.setLightStatus(0);
-                machine.setDate(time);
-                machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
-                //将Mqtt bean转换为json
-                publishContent = gson.toJson(machine);
-                //发布消息
-                publishMessage(publishContent);
-
-                ElevatorStatus = 1;
-                LightStatus = 0;
-
-                //设置UI层显示
-//                init(receiveContent);
-            }else {
-                PopTip.show("当前nodeMCU未在线！");
-            }
-
-        });
-
-    }
 
     /**
      * 创建加载view
@@ -586,7 +289,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             //设置授权accesstoken
             EZUIKit.setAccessToken(accesstoken);
             //设置播放资源参数
-            mPlayer.setCallBack(this);
+            mPlayer.setCallBack((EZUIPlayer.EZUIPlayerCallBack) this);
             mPlayer.setUrl(playUrl);
         }
 
@@ -822,8 +525,35 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    //
     /**
-     * mqtt test
+     * 获取设备唯一信息，保证每台客户端，有唯一的ID号
+     * */
+    public String getDeviceInfo(){
+        String deviceID = null;
+        Date date = new Date();
+        TimeInfo timeInfo = CustomUtils.LongToString(date);
+        sp = getSharedPreferences("deviceInfo", Context.MODE_PRIVATE);
+
+        //判断如果value为空，则获取
+        if (sp.getString("deviceID", "").isEmpty()){
+            deviceID = CustomUtils.getDeviceBrand()+" "+CustomUtils.getDeviceModel()+" "+timeInfo.getY_m_d()+" "+timeInfo.getHmString();
+            SharedPreferences.Editor editor = sp.edit();
+            //记住用户名、密码、
+            editor.putString("deviceID", deviceID);
+            editor.apply();
+            Log.e(TAG, "getDeviceInfo: >>>>>>>>>>>>>>>>>>>>"+deviceID );
+        }else {
+            deviceID = sp.getString("deviceID", "");
+        }
+        clientId = deviceID;
+        Log.e(TAG, "getDeviceInfo:?>>>>>>>>>>>>>>> "+clientId );
+
+        return deviceID;
+    }
+
+    /**
+     * mqtt 初始化
      * */
     public void MqttInit(){
         /* 创建MqttConnectOptions对象并配置username和password */
@@ -993,68 +723,57 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     /**
-     * 状态栏管理
+     * @Description 打开软件时，读取信息
+     * @Author 游同学
      * */
-    public void Clear(){
-        ImmersionBar.with(MainActivity.this)
-                .transparentStatusBar()  //透明状态栏，不写默认透明色
-                .navigationBarColor(R.color.white)
-                .statusBarDarkFont(true)   //状态栏字体是深色，不写默认为亮色
-                .init();
-
-        //隐藏action bar
-        ActionBar actionBar = getSupportActionBar();
-        assert actionBar != null;
-        actionBar.hide();
-    }
-
-    /**
-     * 获取状态栏高度，设置layout的margin——top值
-     *
-     * */
-    public void SetMargin(){
-        //获取状态栏高度
-        int statusBarHeight1 = 0;
-        //获取status_bar_height资源的ID
-        int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
-        if (resourceId > 0) {
-            //根据资源ID获取响应的尺寸值
-            statusBarHeight1 = getResources().getDimensionPixelSize(resourceId);
-        }
-        Log.e("TAG", "方法1状态栏高度:>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" + statusBarHeight1);
-
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-
-        lp.setMargins(0, statusBarHeight1, 0, 0);
-
-        RelativeLayout titleLayout = findViewById(R.id.titleRelative_richeng);
-        titleLayout.setLayoutParams(lp);
-    }
-
-    /**
-     * 获取设备唯一信息，保证每台客户端，有唯一的ID号
-     * */
-    public String getDeviceInfo(){
-        String deviceID = null;
-        Date date = new Date();
-        TimeInfo timeInfo = CustomUtils.LongToString(date);
-        sp = getSharedPreferences("deviceInfo", Context.MODE_PRIVATE);
-
-        //判断如果value为空，则获取
-        if (sp.getString("deviceID", "").isEmpty()){
-            deviceID = CustomUtils.getDeviceBrand()+" "+CustomUtils.getDeviceModel()+" "+timeInfo.getY_m_d()+" "+timeInfo.getHmString();
-            SharedPreferences.Editor editor = sp.edit();
-            //记住用户名、密码、
-            editor.putString("deviceID", deviceID);
-            editor.apply();
-            Log.e(TAG, "getDeviceInfo: >>>>>>>>>>>>>>>>>>>>"+deviceID );
+    @SuppressLint("UseCompatLoadingForDrawables")
+    public void init(String nowStatus){
+        //订阅
+        Log.e(TAG, "当前初始值状态为:+++++++++++ "+nowStatus );
+        if (nowStatus.equals("Device Offline!")){
+            ElevatorStatus = 0;
+            LightStatus = 0;
         }else {
-            deviceID = sp.getString("deviceID", "");
-        }
-        clientId = deviceID;
-        Log.e(TAG, "getDeviceInfo:?>>>>>>>>>>>>>>> "+clientId );
+            Mqtt mqtt = gson.fromJson(nowStatus,Mqtt.class);
+            ElevatorStatus = mqtt.getElevatorStatus();
+            LightStatus = mqtt.getLightStatus();
 
-        return deviceID;
+            Log.e(TAG, "setElevatorStatus: "+mqtt.getElevatorStatus() );
+            date_tv_text.setText("操作时间： "+mqtt.getDate());
+        }
+
+        if(nodeMCU){
+            nodeMCUStatus.setImageDrawable(getDrawable(R.drawable.ic_online));
+            nodeMcuImg.setImageDrawable(getDrawable(R.drawable.ic_nodemcu_on));
+        }else {
+            nodeMCUStatus.setImageDrawable(getDrawable(R.drawable.ic_offline));
+            nodeMcuImg.setImageDrawable(getDrawable(R.drawable.ic_nodemcu_off));
+        }
+        if (ElevatorStatus == 1){
+            elevatorStatus.setImageDrawable(getDrawable(R.drawable.ic_online));
+            elevatorImg.setImageDrawable(getDrawable(R.drawable.ic_elevator_run));
+
+        }else if (ElevatorStatus == 0){
+            elevatorStatus.setImageDrawable(getDrawable(R.drawable.ic_offline));
+            elevatorImg.setImageDrawable(getDrawable(R.drawable.ic_elevator_stop));
+        }
+        if (LightStatus == 0){
+            lightStatus.setImageDrawable(getDrawable(R.drawable.ic_offline));
+            lightImg.setImageDrawable(getDrawable(R.drawable.ic_light_off));
+        }else if (LightStatus == 1){
+            lightStatus.setImageDrawable(getDrawable(R.drawable.ic_online));
+            lightImg.setImageDrawable(getDrawable(R.drawable.ic_light_on));
+        }
+        if(nodeMCU){
+            recStatus.setImageDrawable(getDrawable(R.drawable.ic_online));
+            recImg.setImageDrawable(getDrawable(R.drawable.ic_rec));
+        }else {
+            recStatus.setImageDrawable(getDrawable(R.drawable.ic_offline));
+            recImg.setImageDrawable(getDrawable(R.drawable.ic_rec_offline));
+        }
+
+        toast();
+
     }
 
     /**
@@ -1070,86 +789,231 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     /**
-     * 侧边菜单栏
+     * 这个代码贴在这儿，Mqtt库在连接时会对Sdcard文件进行读写， 实验室的小米电视 Xiaomi MiTV4-ANSM0 安卓版本 6.0.1 API23,单独在AndroidManifest中申请 EXTERNAL_STORAGE 不行，电视不会弹窗
+     * 使用 java 代码 ActivityCompat.requestPermissions 类进行动态获取权限，还是不能弹窗
+     * 测试 XXPermissions 权限申请库，可以成功调出弹窗
+     *
+     * 解决方案为：动态申请 MANAGE_EXTERNAL_STORAGE 权限，低于23不能申请WRITE_EXTERNAL_STORAGE和READ_EXTERNAL_STORAGE,,minni sdk 设置为 minSdk 23
+     *
+     * 如下是复现不能写入文件的 Kotlin 代码
      * */
-    @SuppressLint("WrongConstant")
-    public void showDrawer(){
-        LinearLayout more = findViewById(R.id.more);
+    /*fun testit() {
+        // ask Android where we can put files
+        var myDir: File? = this.getExternalFilesDir(TAG)
 
-        DrawerLayout drawerLayout = findViewById(R.id.drawer_layout);
-        more.setOnClickListener(view -> {
-            drawerLayout.openDrawer(Gravity.START);
-
-        });
-
-        drawerLayout.setDrawerListener(new DrawerLayout.DrawerListener() {
-            @Override
-            public void onDrawerSlide(@NonNull View drawerView, float slideOffset) {
-
+        if (myDir == null) {
+            // No external storage, use internal storage instead.
+            myDir = this.getDir(TAG, MODE_PRIVATE)
+            Log.i(TAG, "write to internal")
+            if (myDir == null) {
+                Log.w(TAG, "write to null")
             }
+        } else {
+            Log.i(TAG, "write to external")
+        }
 
-            @Override
-            public void onDrawerOpened(@NonNull View drawerView) {
-                ImmersionBar.with(MainActivity.this)
-                        .statusBarDarkFont(false)   //状态栏字体是深色，不写默认为亮色
-                        .init();
-            }
+        Log.i(TAG, myDir!!.absolutePath)
 
-            @Override
-            public void onDrawerClosed(@NonNull View drawerView) {
-                ImmersionBar.with(MainActivity.this)
-                        .transparentStatusBar()  //透明状态栏，不写默认透明色
-                        .navigationBarColor(R.color.white)
-                        .statusBarDarkFont(true)   //状态栏字体是深色，不写默认为亮色
-                        .init();
+        var dataDir : File? = File(myDir!!.absolutePath)
+        Log.i(TAG, "external canwrite?" + dataDir?.canWrite())
 
-            }
+        myDir = this.getDir(TAG, MODE_PRIVATE)
+        dataDir = File(myDir!!.absolutePath)
+        Log.i(TAG, "internal dir canwrite?" + dataDir?.canWrite())
+    }*/
+    public void getPermission() {
+        if (!XXPermissions.isGranted(TvActivity.this, Permission.MANAGE_EXTERNAL_STORAGE) && Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+            Log.e("AiMqtt", "运行申请权限");
+            XXPermissions.with(this)
+                    // 申请单个权限
+                    .permission(Permission.MANAGE_EXTERNAL_STORAGE)
+                    // 申请多个权限
+                    //.permission(Permission.Group.STORAGE)
+                    // 设置权限请求拦截器（局部设置）
+                    //.interceptor(new PermissionInterceptor())
+                    // 设置不触发错误检测机制（局部设置）
+                    //.unchecked()
+                    .request(new OnPermissionCallback() {
 
-            @Override
-            public void onDrawerStateChanged(int newState) {
+                        @Override
+                        public void onGranted(List<String> permissions, boolean all) {
+                            if (all) {
+                                Toast.makeText(TvActivity.this,"获取sdcard权限成功", Toast.LENGTH_LONG).show();
+                            } else {
+                                Toast.makeText(TvActivity.this,"获取部分权限成功，但部分权限未正常授予", Toast.LENGTH_LONG).show();
+                            }
+                        }
 
-            }
-        });
+                        @Override
+                        public void onDenied(List<String> permissions, boolean never) {
+                            if (never) {
+                                Toast.makeText(TvActivity.this,"被永久拒绝授权，请手动授予sdcard权限", Toast.LENGTH_LONG).show();
+                                // 如果是被永久拒绝就跳转到应用权限系统设置页面
+                                XXPermissions.startPermissionActivity(TvActivity.this, permissions);
+                            } else {
+                                Toast.makeText(TvActivity.this,"获取sdcard权限失败", Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    });
+        }
+
     }
 
     /**
-     * 设置list view
+     * 控制电梯网络请求,电视去除了密码验证
      * */
+    public void setElevatorStatus(){
+        //实例化一个请求对象 api
+        elevatorLayout.setOnClickListener(view -> {
+            if (nodeMCU){
+                if (ElevatorStatus == 1){
 
-    public void initListView() {
+                    Log.e("test", "电梯 1 》》》》》》 Light"+LightStatus );
 
-        mListView = findViewById(R.id.listview);
+                    date = new Date();
+                    timeInfo = CustomUtils.LongToString(date);
+                    time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
+                    machine.setElevatorStatus(0);
+                    machine.setLightStatus(LightStatus);
+                    machine.setDate(time);
+                    machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
+                    //将Mqtt bean转换为json
+                    publishContent = gson.toJson(machine);
+                    //发布消息
+                    publishMessage(publishContent);
 
-        List<Map<String, Object>> mListItems = new ArrayList<>();
-        for (int i = 0; i < mImageId.length; i++) {
-            Map<String, Object> mMap = new HashMap<>();
-            mMap.put("image", mImageId[i]);
-            mMap.put("title", mTitle[i]);
-            mListItems.add(mMap);
-        }
+                    //发布之后需要判断，nodeMCU返回的信息，来判断是否操作成功
+                    if (!receiveContent.isEmpty()){
+                        Mqtt mqtt = gson.fromJson(receiveContent,Mqtt.class);
+                        //判断接收到到结果与发送的是否相同
+                        if (mqtt.getElevatorStatus() == ElevatorStatus & mqtt.getLightStatus() == LightStatus){
+                            ElevatorStatus = 0;
+                            //设置UI层显示
+//                          init(receiveContent);
 
-        SimpleAdapter mAdapter = new SimpleAdapter(MainActivity.this, mListItems, R.layout.drawer_listview_item, new String[]{"title", "image"}, new int[]{R.id.item_text, R.id.item_image});
-        mListView.setAdapter(mAdapter);
+                        }
+                    }
 
-        //设置点击监听事件
-        mListView.setOnItemClickListener((adapterView, view, i, l) -> {
+                }else if (ElevatorStatus == 0){
 
-            if (i == 0){
-                Intent intent = new Intent();
-                intent.setClass(MainActivity.this, com.services.smartcam.DeviceActivity.class);
-                startActivity(intent);
+                    date = new Date();
+                    timeInfo = CustomUtils.LongToString(date);
+                    time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
+                    machine.setElevatorStatus(1);
+                    machine.setLightStatus(LightStatus);
+                    machine.setDate(time);
+                    machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
+                    //将Mqtt bean转换为json
+                    publishContent = gson.toJson(machine);
+                    //发布消息
+                    publishMessage(publishContent);
 
-            }else if (i == 1){
-                Intent intent = new Intent();
-                intent.setClass(MainActivity.this,EZerrorActivity.class);
-                startActivity(intent);
+                    //发布之后需要判断，nodeMCU返回的信息，来判断是否操作成功
+                    if (!receiveContent.isEmpty()){
+                        Mqtt mqtt = gson.fromJson(receiveContent,Mqtt.class);
+                        //判断接收到到结果与发送的是否相同
+                        if (mqtt.getElevatorStatus() == ElevatorStatus & mqtt.getLightStatus() == LightStatus){
+                            ElevatorStatus = 1;
 
+                            //设置UI层显示
+//                          init(receiveContent);
+
+                        }
+                    }
+
+
+                }
+            }else {
+                PopTip.show("当前nodeMCU未在线！");
             }
 
-//                Toast.makeText(getContext(), "Click item：" + i, Toast.LENGTH_SHORT).show();
-
-
         });
+
     }
 
+    /**
+     * 控制预警灯网络请求
+     * */
+    public void setLightStatus(){
+        lightLayout.setOnClickListener(view -> {
+            if (nodeMCU){
+                //显示等待进度框
+                WaitDialog.show("正在处理...");
+
+                if (LightStatus == 0){
+                    date = new Date();
+                    timeInfo = CustomUtils.LongToString(date);
+                    time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
+                    machine.setElevatorStatus(ElevatorStatus);
+                    machine.setLightStatus(1);
+                    machine.setDate(time);
+                    machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
+                    //将Mqtt bean转换为json
+                    publishContent = gson.toJson(machine);
+                    //发布消息
+                    publishMessage(publishContent);
+
+                    LightStatus = 1;
+                    //设置UI层显示
+//                    init(receiveContent);
+
+                }else if (LightStatus == 1){
+                    date = new Date();
+                    timeInfo = CustomUtils.LongToString(date);
+                    time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
+                    machine.setElevatorStatus(ElevatorStatus);
+                    machine.setLightStatus(0);
+                    machine.setDate(time);
+                    machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
+                    //将Mqtt bean转换为json
+                    publishContent = gson.toJson(machine);
+                    //发布消息
+                    publishMessage(publishContent);
+
+                    LightStatus = 0;
+
+                    //设置UI层显示
+//                    init(receiveContent);
+                }
+            }else {
+                PopTip.show("当前nodeMCU未在线！");
+            }
+
+        });
+
+    }
+
+    /**
+     * 全部复原方法
+     * */
+    public void rec() {
+        recLayout.setOnClickListener(view -> {
+            if (nodeMCU){
+                //显示等待进度框
+                WaitDialog.show("正在处理...");
+
+                date = new Date();
+                timeInfo = CustomUtils.LongToString(date);
+                time = timeInfo.getY_m_d()+" "+timeInfo.getHmString();
+                machine.setElevatorStatus(1);
+                machine.setLightStatus(0);
+                machine.setDate(time);
+                machine.setDevice(clientId);//这里的 ClientID为机型加第一次打开软件时间
+                //将Mqtt bean转换为json
+                publishContent = gson.toJson(machine);
+                //发布消息
+                publishMessage(publishContent);
+
+                ElevatorStatus = 1;
+                LightStatus = 0;
+
+                //设置UI层显示
+//                init(receiveContent);
+            }else {
+                PopTip.show("当前nodeMCU未在线！");
+            }
+
+        });
+
+    }
 }

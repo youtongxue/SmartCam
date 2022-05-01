@@ -34,8 +34,16 @@ public class SplashActivity extends AppCompatActivity {
 
                 @Override
                 public void onAnimationEnd(Animation animation) {
-                    Intent lIntent = new Intent(SplashActivity.this, com.services.smartcam.MainActivity.class);
-                    startActivity(lIntent);
+                    //这儿按理来说，是应该采用Android中的限定符来做显示不同的视图的判定，但是考虑到TV 的输入方式为遥控器，所以业务逻辑代码也需要更改，就单独写了个TvActivity
+                    //这儿是根据屏幕的宽度来判定是否为大屏幕，（这个方式局限性很大也不够准确）
+                    Intent intent;
+                    int w = DisplayUtil.getRealScreenRelatedInformation(SplashActivity.this);
+                    if (w > 1080) {
+                        intent = new Intent(SplashActivity.this, TvActivity.class);
+                    } else {
+                        intent = new Intent(SplashActivity.this, MainActivity.class);
+                    }
+                    startActivity(intent);
                     overridePendingTransition(0, 0);
                     finish();
                 }
